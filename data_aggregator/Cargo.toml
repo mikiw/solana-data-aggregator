@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+helius = "0.2.1"
+tokio = "1.38.0"
 solana-sdk = "1.18.17"
 solana-client = "1.18.17"
-solana-transaction-status = "1.18.17"
+
