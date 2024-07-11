@@ -1,8 +1,6 @@
 use anyhow::Error;
 use rand::{distributions::Alphanumeric, Rng};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::RwLock;
-
+use std::collections::HashMap;
 use helius::{
     types::{Cluster, ParseTransactionsRequest},
     Helius,
@@ -10,29 +8,12 @@ use helius::{
 use solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::types::{Account, AccountData, Database, Transaction};
-
-#[derive(Clone)]
-pub struct DataAggregator {
-    pub retrieval: Arc<RwLock<Retrieval>>,
-}
-
-impl DataAggregator {
-    pub fn new(retrieval: Retrieval) -> Self {
-        Self {
-            retrieval: Arc::new(RwLock::new(retrieval)),
-        }
-    }
-}
-
-/// Retrieval can be shared between threads with read/write lock access
-pub struct Retrieval {
-    pub helius: Helius,
-    pub database: Database,
-}
+use crate::types::{Account, AccountData, Database, Retrieval, Transaction};
 
 impl Retrieval {
     pub fn new() -> Self {
+        // Since it's private repo api_key can he here, once it will change for public
+        // this api_key needs to be deprecated on Helius page
         let helius = match Helius::new("24cf0798-4008-4c81-aa5e-2875323278cd", Cluster::MainnetBeta)
         {
             Ok(helius) => helius,
@@ -45,12 +26,15 @@ impl Retrieval {
         }
     }
 
+    // Function is loading data from API to memory.
+    // This might change in future once the database layer is added.
+    //
+    // Currently the whole workflow of the program is based on account tracking,
+    // this is why we need pass account_pubkey.
+    //
+    // TODO: Later remove account_pubkey and adapt to crawling by block, same as blockchain indexers works.
     pub async fn load_data(&mut self, account_pubkey: Pubkey) -> Result<(), Error> {
-        // TODO: comment this load
-        // TODO: change account_pubkey to account_pubkeys as Vec...
-        // TODO: load_data by blocks?
-
-        // TODO: change self.helius.rpc() to async/await
+        // TODO: Change self.helius.rpc() to async/await
         let account_data = self
             .helius
             .rpc()
@@ -77,15 +61,18 @@ impl Retrieval {
             .iter()
             .map(|tx| tx.signature.clone())
             .collect();
+
         let request = ParseTransactionsRequest {
             transactions: request_signatures,
         };
 
-        let mut txs: HashMap<String, Transaction> = HashMap::new();
+        let mut transactions: HashMap<String, Transaction> = HashMap::new();
+        
         let response = self.helius.parse_transactions(request).await.unwrap();
+
         // TODO: change for to map
         for tx in response {
-            txs.insert(
+            transactions.insert(
                 tx.signature.clone(),
                 Transaction {
                     signature: tx.signature.clone(),
@@ -106,7 +93,7 @@ impl Retrieval {
                 executable: account_data.executable,
                 rent_epoch: account_data.rent_epoch,
             },
-            transactions: Some(txs),
+            transactions: Some(transactions),
         };
 
         let mut data: HashMap<String, AccountData> = HashMap::new();
@@ -115,13 +102,6 @@ impl Retrieval {
         // Fill memory database with fetched data
         self.set_database(Database { data: Some(data) }).await?;
 
-        // TODO: current_block_height will be helpful later
-        // let current_block_height = self.helius.rpc().solana_client.get_block_height().unwrap();
-        // println!("current_block_height: {:?}", current_block_height);
-
-        // let block = self.helius.rpc()
-        //     .solana_client.get_block(current_block_height - 10).unwrap();
-        // println!("block: {:?}", block);
         Ok(())
     }
 
@@ -133,6 +113,16 @@ impl Retrieval {
     }
 
     pub async fn database_update(&mut self, account: String) -> Result<(), Error> {
+        // TODO: implement database update
+        
+        // TODO: current_block_height will be helpful later
+        // let current_block_height = self.helius.rpc().solana_client.get_block_height().unwrap();
+        // println!("current_block_height: {:?}", current_block_height);
+
+        // let block = self.helius.rpc()
+        //     .solana_client.get_block(current_block_height - 10).unwrap();
+        // println!("block: {:?}", block);
+
         let data = self.database.data.as_mut();
         match data {
             Some(data) => {
@@ -167,9 +157,9 @@ impl Retrieval {
         match &self.database.data {
             Some(data) => {
                 let account = data.get(&account.to_string()).unwrap();
-                let result = account.transactions.as_ref().unwrap().len();
+                let transactions_count = account.transactions.as_ref().unwrap().len();
 
-                Ok(result)
+                Ok(transactions_count)
             }
             _ => Err(Error::msg("Database is not set!")),
         }
@@ -198,7 +188,7 @@ impl Retrieval {
         }
     }
 
-    // TODO: Change this to remove account_pubkey and use only tx hash
+    // TODO: Later remove account_pubkey and adapt to crawling by block, same as blockchain indexers works.
     pub async fn get_transaction(
         &self,
         account_pubkey: String,
@@ -211,13 +201,14 @@ impl Retrieval {
             .unwrap()
             .get(&account_pubkey.to_string())
             .unwrap();
-        let tx = account
+
+        let transaction = account
             .transactions
             .as_ref()
             .unwrap()
             .get(&tx_hash)
             .unwrap();
 
-        Ok(tx.clone())
+        Ok(transaction.clone())
     }
 }

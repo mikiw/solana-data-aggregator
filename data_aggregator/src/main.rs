@@ -1,12 +1,11 @@
 use axum::{extract::Path, routing::get, Extension, Json, Router};
 use futures::future::join_all;
-use retrieval::{DataAggregator, Retrieval};
 use solana_sdk::pubkey::Pubkey;
 use std::time::Duration;
 use tokio::task::{self};
 use tokio::time::interval;
 use tower_http::timeout::TimeoutLayer;
-use types::{Account, Transaction};
+use types::{Account, DataAggregator, Retrieval, Transaction};
 
 mod retrieval;
 mod types;

@@ -1,7 +1,28 @@
-use std::collections::HashMap;
-
+use std::{collections::HashMap, sync::Arc};
+use helius::Helius;
 use serde::Serialize;
 use solana_sdk::pubkey::Pubkey;
+use tokio::sync::RwLock;
+
+/// DataAggregator can be shared between threads with read/write lock access
+#[derive(Clone)]
+pub struct DataAggregator {
+    pub retrieval: Arc<RwLock<Retrieval>>,
+}
+
+impl DataAggregator {
+    pub fn new(retrieval: Retrieval) -> Self {
+        Self {
+            retrieval: Arc::new(RwLock::new(retrieval)),
+        }
+    }
+}
+
+// TODO: helius and database can be abstracted in future to handle different types of APIs and databases
+pub struct Retrieval {
+    pub helius: Helius,
+    pub database: Database,
+}
 
 #[derive(Debug)]
 pub struct Database {
@@ -30,6 +51,7 @@ pub struct Account {
     pub rent_epoch: u64,
 }
 
+// TODO: mapping to everything that is missing. Especially token_transfers,
 #[derive(Debug, Clone, Serialize)]
 pub struct Transaction {
     pub signature: String,
@@ -38,7 +60,6 @@ pub struct Transaction {
     pub fee: i32,
     pub fee_payer: String,
     pub slot: i32,
-    // TODO: mapping to everything that is missing. Especially token_transfers,
 
     // pub native_transfers: Option<Vec<NativeTransfer>>,
 
