@@ -1,108 +1,12 @@
-use axum::{extract::Path, routing::get, Extension, Json, Router};
 use futures::future::join_all;
+use server::{server_log, server_monitor, run_server};
 use solana_sdk::pubkey::Pubkey;
-use std::time::Duration;
 use tokio::task::{self};
-use tokio::time::interval;
-use tower_http::timeout::TimeoutLayer;
-use types::{Account, DataAggregator, Retrieval, Transaction};
+use types::{DataAggregator, Retrieval};
 
 mod retrieval;
+mod server;
 mod types;
-
-async fn database_monitor(
-    aggregator: DataAggregator,
-    account: String,
-    interval_in_sec: u64,
-) -> Result<(), anyhow::Error> {
-    let mut interval = interval(Duration::from_secs(interval_in_sec));
-
-    loop {
-        tokio::select! {
-                _ = interval.tick() => {
-                    let retrieval = aggregator.retrieval.read().await;
-                    let sol = retrieval.get_account_balance_sol(account.clone()).await;
-                    let transaction_count = retrieval.get_account_transactions_count(account.clone()).await;
-
-                    println!("Transactions in DB: {:?} Current Balance: {:?}", transaction_count, sol);
-            }
-        }
-    }
-}
-
-async fn database_update(
-    aggregator: DataAggregator,
-    account: String,
-    interval_in_sec: u64,
-) -> Result<(), anyhow::Error> {
-    let mut interval = interval(Duration::from_secs(interval_in_sec));
-
-    loop {
-        tokio::select! {
-                _ = interval.tick() => {
-                    let mut retrieval = aggregator.retrieval.write().await;
-                    retrieval.database_update(account.clone()).await.unwrap();
-
-                    println!("Database updated");
-            }
-        }
-    }
-}
-
-async fn get_account(
-    Extension(aggregator): Extension<DataAggregator>,
-    Path(account_id): Path<String>,
-) -> Result<Json<Account>, axum::http::StatusCode> {
-    let retrieval = aggregator.retrieval.read().await;
-
-    let account = retrieval
-        .get_account(account_id)
-        .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(account))
-}
-
-async fn get_transaction(
-    Extension(aggregator): Extension<DataAggregator>,
-    Path((account_id, transaction_id)): axum::extract::Path<(String, String)>,
-) -> Result<Json<Transaction>, axum::http::StatusCode> {
-    let retrieval = aggregator.retrieval.read().await;
-
-    let transaction = retrieval
-        .get_transaction(account_id, transaction_id)
-        .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(transaction))
-}
-
-async fn run_server(
-    aggregator: DataAggregator,
-    close_rx: tokio::sync::oneshot::Receiver<()>,
-) -> Result<(), anyhow::Error> {
-    let app = Router::new()
-        .route("/", get(|| async { "Pong!" }))
-        .route("/account/:account_id", get(get_account))
-        .route("/transaction/:account_id/:transaction_id", get(get_transaction))
-        .layer(TimeoutLayer::new(Duration::from_secs(5)))
-        .layer(Extension(aggregator));
-
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
-
-    println!("Starting server...");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            _ = close_rx.await;
-        })
-        .await
-        .unwrap();
-
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -138,11 +42,11 @@ async fn main() -> Result<(), anyhow::Error> {
     // Aggregator background tasks
     let mut tasks = vec![];
 
-    let monitor_handle = task::spawn(database_monitor(aggregator.clone(), account.clone(), 3));
-    tasks.push(monitor_handle);
+    let log_handle = task::spawn(server_log(aggregator.clone(), account.clone(), 3));
+    tasks.push(log_handle);
 
-    let update_handle = task::spawn(database_update(aggregator.clone(), account, 6));
-    tasks.push(update_handle);
+    let monitor_handle = task::spawn(server_monitor(aggregator.clone(), account, 6));
+    tasks.push(monitor_handle);
 
     let (_close_tx, close_rx) = tokio::sync::oneshot::channel();
 
