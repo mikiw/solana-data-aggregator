@@ -22,9 +22,9 @@ async fn database_monitor(
                 _ = interval.tick() => {
                     let retrieval = aggregator.retrieval.read().await;
                     let sol = retrieval.get_account_balance_sol(account.clone()).await;
-                    let txs_count = retrieval.get_account_transactions_count(account.clone()).await;
+                    let transaction_count = retrieval.get_account_transactions_count(account.clone()).await;
 
-                    println!("Transactions in DB: {:?} Current Balance: {:?}", txs_count, sol);
+                    println!("Transactions in DB: {:?} Current Balance: {:?}", transaction_count, sol);
             }
         }
     }
@@ -65,12 +65,12 @@ async fn get_account(
 
 async fn get_transaction(
     Extension(aggregator): Extension<DataAggregator>,
-    Path((account_id, tx_id)): axum::extract::Path<(String, String)>,
+    Path((account_id, transaction_id)): axum::extract::Path<(String, String)>,
 ) -> Result<Json<Transaction>, axum::http::StatusCode> {
     let retrieval = aggregator.retrieval.read().await;
 
     let transaction = retrieval
-        .get_transaction(account_id, tx_id)
+        .get_transaction(account_id, transaction_id)
         .await
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -84,7 +84,7 @@ async fn run_server(
     let app = Router::new()
         .route("/", get(|| async { "Pong!" }))
         .route("/account/:account_id", get(get_account))
-        .route("/transaction/:account_id/:tx_id", get(get_transaction))
+        .route("/transaction/:account_id/:transaction_id", get(get_transaction))
         .layer(TimeoutLayer::new(Duration::from_secs(5)))
         .layer(Extension(aggregator));
 
@@ -144,13 +144,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let update_handle = task::spawn(database_update(aggregator.clone(), account, 6));
     tasks.push(update_handle);
 
-    // TODO: Remove later since it's no needed
-    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
+    let (_close_tx, close_rx) = tokio::sync::oneshot::channel();
 
-    // TODO: This can be fixed. It could be handled with tasks vector and join_all(tasks).
+    // TODO: It could be handled with tasks vector and join_all(tasks), but there is some type problem.
     run_server(aggregator.clone(), close_rx).await?;
 
-    // Join all tasks
+    // Join all aggregator background tasks
     let results = join_all(tasks).await;
 
     // Handle the results of the tasks
