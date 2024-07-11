@@ -8,7 +8,7 @@ use helius::{
 use solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::types::{Account, AccountData, Database, Retrieval, Transaction};
+use crate::types::{Account, AccountData, Database, NativeTransfer, Retrieval, Transaction};
 
 impl Retrieval {
     pub fn new() -> Self {
@@ -71,16 +71,26 @@ impl Retrieval {
         let response = self.helius.parse_transactions(request).await.unwrap();
 
         // TODO: change for to map
-        for tx in response {
+        for transaction in response {
+
+            let native_transfers = transaction.native_transfers.unwrap().into_iter().map(|native_transfer| {
+                NativeTransfer {
+                    amount: native_transfer.amount.as_u64().unwrap(),
+                    from_user_account: native_transfer.user_accounts.from_user_account,
+                    to_user_account: native_transfer.user_accounts.to_user_account,
+                }
+            }).collect();
+
             transactions.insert(
-                tx.signature.clone(),
+                transaction.signature.clone(),
                 Transaction {
-                    signature: tx.signature.clone(),
-                    timestamp: tx.timestamp,
-                    description: tx.description.clone(),
-                    fee: tx.fee,
-                    fee_payer: tx.fee_payer.clone(),
-                    slot: tx.slot,
+                    signature: transaction.signature.clone(),
+                    timestamp: transaction.timestamp,
+                    description: transaction.description.clone(),
+                    fee: transaction.fee,
+                    fee_payer: transaction.fee_payer.clone(),
+                    slot: transaction.slot,
+                    native_transfers: Some(native_transfers),
                 },
             );
         }
@@ -134,6 +144,7 @@ impl Retrieval {
                     signature: "".to_string(),
                     timestamp: 0,
                     slot: 0,
+                    native_transfers: None,
                 };
                 let dummy_random_key: String = rand::thread_rng()
                     .sample_iter(&Alphanumeric)
