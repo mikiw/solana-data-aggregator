@@ -7,7 +7,7 @@ mod types;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // TODO: Comment code and refactor a bit, check again.
-    // TODO: Write readme.
+    // TODO: Write readme add screens from solana explorer, terminal.
     // TODO: Add unit and integration tests covering the happy path and edge cases.
 
     // TODO: Add Data Storage (optional).

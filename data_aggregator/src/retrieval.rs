@@ -33,8 +33,8 @@ impl Retrieval {
         let balances: IndexMap<String, f64> = self
             .database
             .accounts
-            .iter()
-            .map(|(_, account)| {
+            .values()
+            .map(|account| {
                 (
                     account.account_pubkey.to_string().clone(),
                     account.lamports as f64 / 1_000_000_000.0,
@@ -53,9 +53,8 @@ impl Retrieval {
         let account_keys: Vec<String> = self.database.accounts.keys().cloned().collect();
 
         // TODO: This implementation is based on naive assumptions and is suitable only for a small number of accounts.
-        // For production, implement a robust querying logic (get_multiple_accounts() can be used).)
-        for account_id in account_keys
-        {
+        // For production, implement a robust querying logic (get_multiple_accounts() can be used)
+        for account_id in account_keys {
             self.fetch_account(account_id).await?;
         }
 
@@ -108,13 +107,13 @@ impl Retrieval {
         let request: ParseTransactionsRequest = ParseTransactionsRequest {
             transactions: vec![tx_signature],
         };
-        let response = &self.helius.parse_transactions(request).await.unwrap()[0];
+        let tx_response = &self.helius.parse_transactions(request).await.unwrap()[0];
 
-        let native_transfers = response
+        let native_transfers = tx_response
             .native_transfers
             .as_ref()
             .unwrap()
-            .into_iter()
+            .iter()
             .map(|native_transfer| NativeTransfer {
                 amount: native_transfer.amount.as_u64().unwrap(),
                 from_user_account: native_transfer.user_accounts.from_user_account.clone(),
@@ -123,18 +122,18 @@ impl Retrieval {
             .collect();
 
         let transaction = Transaction {
-            signature: response.signature.clone(),
-            timestamp: response.timestamp,
-            description: response.description.clone(),
-            fee: response.fee,
-            fee_payer: response.fee_payer.clone(),
-            slot: response.slot,
+            signature: tx_response.signature.clone(),
+            timestamp: tx_response.timestamp,
+            description: tx_response.description.clone(),
+            fee: tx_response.fee,
+            fee_payer: tx_response.fee_payer.clone(),
+            slot: tx_response.slot,
             native_transfers: Some(native_transfers),
         };
 
         self.database
             .transactions
-            .insert(response.signature.clone(), transaction.clone());
+            .insert(tx_response.signature.clone(), transaction.clone());
 
         Ok(transaction)
     }

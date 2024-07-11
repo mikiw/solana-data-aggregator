@@ -1,17 +1,14 @@
 use std::time::Duration;
 
 use axum::{extract::Path, routing::get, Extension, Json, Router};
-use tokio::time::interval;
-use tower_http::timeout::TimeoutLayer;
 use futures::future::join_all;
 use tokio::task::{self};
+use tokio::time::interval;
+use tower_http::timeout::TimeoutLayer;
 
 use crate::types::{Account, DataAggregator, Retrieval, Transaction};
 
-async fn server_log(
-    aggregator: DataAggregator,
-    interval_in_sec: u64,
-) -> Result<(), anyhow::Error> {
+async fn server_log(aggregator: DataAggregator, interval_in_sec: u64) -> Result<(), anyhow::Error> {
     let mut interval = interval(Duration::from_secs(interval_in_sec));
 
     loop {
@@ -60,9 +57,9 @@ async fn get_account(
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if account_exists {
-        // Account is already cached in our database.
+        // Account is already cached in database.
         // We assume that data is already updated by pooling task but
-        // an additional query mechanism can be added here.
+        // an additional query mechanism can be also added here.
         let account = aggregator
             .retrieval
             .read()
@@ -100,7 +97,7 @@ async fn get_transaction(
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if transaction_exists {
-        // Transaction is already cached in our database.
+        // Transaction is already cached in database.
         let transaction = aggregator
             .retrieval
             .read()
