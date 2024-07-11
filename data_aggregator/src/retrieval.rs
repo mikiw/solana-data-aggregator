@@ -143,7 +143,7 @@ impl Retrieval {
 
     //             println!("account.transactions.as_ref().unwrap().len() {:?}", account.transactions.as_ref().unwrap().len());
     //             let result = account.transactions.as_ref().unwrap().len();
-                
+
     //             Ok(result)
     //         }
     //         _ => {
@@ -160,9 +160,7 @@ impl Retrieval {
 
                 Ok(sol_balance)
             }
-            _ => {
-                Err(Error::msg("Database is not set!"))
-            }
+            _ => Err(Error::msg("Database is not set!")),
         }
     }
 

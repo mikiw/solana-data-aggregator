@@ -11,9 +11,12 @@ use futures::future::join_all;
 use retrieval::{Retrieval, Server};
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
-use std::{ops::Deref, sync::{Arc, Mutex}};
 use std::time::Duration;
 use std::{future::IntoFuture, net::SocketAddr};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use tokio::task::{self};
 use tokio::time::interval;
 use uuid::Uuid;
@@ -58,25 +61,20 @@ async fn monitor_data(
     }
 }
 
-async fn get_account() {
-    println!("get_account");
+async fn get_account(Path(id): Path<String>) {
+    println!("get_account id: {:?}", id);
 }
 
-async fn get_transaction() {
-    println!("get_transaction");
+async fn get_transaction(Path(id): Path<String>) {
+    println!("get_transaction id: {:?}", id);
 }
 
 async fn run_server(close_rx: tokio::sync::oneshot::Receiver<()>) -> Result<(), anyhow::Error> {
     let app = Router::new()
-    .route("/", get(|| async { "Hello, World!" }))
-    .route("/account/", get(get_account))
-    .route("/transaction/", get(get_transaction))
-    .layer(TimeoutLayer::new(Duration::from_secs(10)));
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
+        .route("/", get(|| async { "Hello, World!" }))
+        .route("/account/:id", get(get_account))
+        .route("/transaction/:id", get(get_transaction))
+        .layer(TimeoutLayer::new(Duration::from_secs(1)));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
@@ -109,7 +107,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let server = Server::new(Retrieval::new());
 
     // Load data to memory
-    server.retrieval.write().await.load_data(account_pubkey).await.unwrap();
+    server
+        .retrieval
+        .write()
+        .await
+        .load_data(account_pubkey)
+        .await
+        .unwrap();
 
     // let binding = server_mut.database.data.as_mut().unwrap();
     // let some_random_tx_hash = binding
@@ -136,8 +140,12 @@ async fn main() -> Result<(), anyhow::Error> {
     // println!("Full transaction: {:?}", tx);
 
     let mut tasks = vec![];
-    
-    let balance_handle = task::spawn(print_current_balance_from_db(server.clone(), account.clone(), 5));
+
+    let balance_handle = task::spawn(print_current_balance_from_db(
+        server.clone(),
+        account.clone(),
+        5,
+    ));
     tasks.push(balance_handle);
 
     let monitor_handle = task::spawn(monitor_data(server.clone(), account, 5));
@@ -149,7 +157,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // TODO: fix this later, it should be handled with tasks vector and join_all
     run_server(close_rx).await?;
-    
+
     // join all tasks
     let results = join_all(tasks).await;
 
