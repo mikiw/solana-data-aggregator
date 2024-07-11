@@ -145,7 +145,7 @@ impl Retrieval {
                     timestamp: 0,
                     slot: 0,
                 };
-                let dummy__random_key: String = rand::thread_rng()
+                let dummy_random_key: String = rand::thread_rng()
                     .sample_iter(&Alphanumeric)
                     .take(7)
                     .map(char::from)
@@ -155,7 +155,7 @@ impl Retrieval {
                     .transactions
                     .as_mut()
                     .unwrap()
-                    .insert(dummy__random_key, dummy_tx);
+                    .insert(dummy_random_key, dummy_tx);
 
                 Ok(())
             }
@@ -187,12 +187,23 @@ impl Retrieval {
         }
     }
 
-    // TODO: change this to remove account_pubkey and use only tx hash
+    pub async fn get_account(&self, account: String) -> Result<Account, Error> {
+        match &self.database.data {
+            Some(data) => {
+                let account = data.get(&account.to_string()).unwrap();
+
+                Ok(account.account.clone())
+            }
+            _ => Err(Error::msg("Database is not set!")),
+        }
+    }
+
+    // TODO: Change this to remove account_pubkey and use only tx hash
     pub async fn get_transaction(
         &self,
         account_pubkey: String,
         tx_hash: String,
-    ) -> Result<&Transaction, Error> {
+    ) -> Result<Transaction, Error> {
         let account = self
             .database
             .data
@@ -207,6 +218,6 @@ impl Retrieval {
             .get(&tx_hash)
             .unwrap();
 
-        Ok(tx)
+        Ok(tx.clone())
     }
 }

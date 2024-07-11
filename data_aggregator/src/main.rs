@@ -1,6 +1,4 @@
-use anyhow::Ok;
-use axum::Extension;
-use axum::{extract::Path, routing::get, Router};
+use axum::{extract::Path, routing::get, Extension, Json, Router};
 use futures::future::join_all;
 use retrieval::{DataAggregator, Retrieval};
 use solana_sdk::pubkey::Pubkey;
@@ -8,6 +6,7 @@ use std::time::Duration;
 use tokio::task::{self};
 use tokio::time::interval;
 use tower_http::timeout::TimeoutLayer;
+use types::{Account, Transaction};
 
 mod retrieval;
 mod types;
@@ -51,16 +50,32 @@ async fn database_update(
     }
 }
 
-async fn get_account(Extension(aggregator): Extension<DataAggregator>, Path(id): Path<String>) {
+async fn get_account(
+    Extension(aggregator): Extension<DataAggregator>,
+    Path(account_id): Path<String>,
+) -> Result<Json<Account>, axum::http::StatusCode> {
     let retrieval = aggregator.retrieval.read().await;
-    println!("retrieval test: {:?}", retrieval.database.data);
-    println!("get_account id: {:?}", id);
+
+    let account = retrieval
+        .get_account(account_id)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(account))
 }
 
-async fn get_transaction(Extension(aggregator): Extension<DataAggregator>, Path(id): Path<String>) {
+async fn get_transaction(
+    Extension(aggregator): Extension<DataAggregator>,
+    Path((account_id, tx_id)): axum::extract::Path<(String, String)>,
+) -> Result<Json<Transaction>, axum::http::StatusCode> {
     let retrieval = aggregator.retrieval.read().await;
-    println!("retrieval test: {:?}", retrieval.database.data);
-    println!("get_transaction id: {:?}", id);
+
+    let transaction = retrieval
+        .get_transaction(account_id, tx_id)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(transaction))
 }
 
 async fn run_server(
@@ -69,8 +84,8 @@ async fn run_server(
 ) -> Result<(), anyhow::Error> {
     let app = Router::new()
         .route("/", get(|| async { "Pong!" }))
-        .route("/account/:id", get(get_account))
-        .route("/transaction/:id", get(get_transaction))
+        .route("/account/:account_id", get(get_account))
+        .route("/transaction/:account_id/:tx_id", get(get_transaction))
         .layer(TimeoutLayer::new(Duration::from_secs(5)))
         .layer(Extension(aggregator));
 
@@ -129,7 +144,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let update_handle = task::spawn(database_update(aggregator.clone(), account, 6));
     tasks.push(update_handle);
-
 
     // TODO: Remove later since it's no needed
     let (close_tx, close_rx) = tokio::sync::oneshot::channel();

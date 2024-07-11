@@ -16,7 +16,7 @@ pub struct AccountData {
     pub transactions: Option<HashMap<String, Transaction>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Account {
     // Account's public key
     pub account_pubkey: Pubkey,
@@ -30,7 +30,7 @@ pub struct Account {
     pub rent_epoch: u64,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Transaction {
     pub signature: String,
     pub timestamp: u64,
