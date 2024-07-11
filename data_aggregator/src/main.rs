@@ -106,15 +106,15 @@ async fn run_server(
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // TODO: Add database instance to axum get functions
+    // TODO: Add update logic as pooling in time
+
     // TODO: Comment code and refactor a bit
     // TODO: Write readme
-    // TODO: Add update logic as pooling in time
     // TODO: Add unit and integration tests
 
+    // TODO: Refactor account_pubkey approach and adapt to crawling by block, the same as blockchain indexers work.
     // TODO: Add Data Storage (optional). I lost a lot of time on tokio/axum problems related to the cargo version,
     // so I needed to pass data storage layer. Also, I heard that you guys are in a hurry.
-
     // TODO: Fix all unwraps. Since it's not production ready code I used a lot of unwraps,
     // but they should be replaced with matches and proper error handling
 

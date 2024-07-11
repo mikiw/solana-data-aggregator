@@ -123,7 +123,8 @@ impl Retrieval {
     }
 
     pub async fn database_update(&mut self, account: String) -> Result<(), Error> {
-        // TODO: implement database update
+        // TODO: This can be also done with helios hooks but for demo I'll use pooling.
+        // TODO: Implement database update
         
         // TODO: current_block_height will be helpful later
         // let current_block_height = self.helius.rpc().solana_client.get_block_height().unwrap();
