@@ -3,10 +3,12 @@ use std::time::Duration;
 use axum::{extract::Path, routing::get, Extension, Json, Router};
 use tokio::time::interval;
 use tower_http::timeout::TimeoutLayer;
+use futures::future::join_all;
+use tokio::task::{self};
 
-use crate::types::{Account, DataAggregator, Transaction};
+use crate::types::{Account, DataAggregator, Retrieval, Transaction};
 
-pub async fn server_log(
+async fn server_log(
     aggregator: DataAggregator,
     interval_in_sec: u64,
 ) -> Result<(), anyhow::Error> {
@@ -28,7 +30,7 @@ pub async fn server_log(
     }
 }
 
-pub async fn server_monitor(
+async fn server_monitor(
     aggregator: DataAggregator,
     interval_in_sec: u64,
 ) -> Result<(), anyhow::Error> {
@@ -123,7 +125,7 @@ async fn get_transaction(
     }
 }
 
-pub async fn run_server(
+async fn run_axum_serve(
     aggregator: DataAggregator,
     close_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<(), anyhow::Error> {
@@ -145,6 +147,35 @@ pub async fn run_server(
         })
         .await
         .unwrap();
+
+    Ok(())
+}
+
+pub async fn run_server() -> Result<(), anyhow::Error> {
+    let aggregator = DataAggregator::new(Retrieval::new());
+
+    // Aggregator background tasks
+    let mut tasks = vec![];
+
+    let log_handle = task::spawn(server_log(aggregator.clone(), 3));
+    tasks.push(log_handle);
+
+    let monitor_handle = task::spawn(server_monitor(aggregator.clone(), 6));
+    tasks.push(monitor_handle);
+
+    let (_close_tx, close_rx) = tokio::sync::oneshot::channel();
+
+    // TODO: This could be handled with a tasks vector and join_all(tasks), but there is a type problem.
+    // I'm sure it's fixable since I did something similar a couple of weeks ago.
+    run_axum_serve(aggregator.clone(), close_rx).await?;
+
+    // Join all aggregator background tasks
+    let results = join_all(tasks).await;
+
+    // Handle the results of the tasks
+    for result in results {
+        result??;
+    }
 
     Ok(())
 }
