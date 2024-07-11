@@ -1,22 +1,39 @@
-use std::collections::HashMap;
-
+use helius::Helius;
 use serde::Serialize;
 use solana_sdk::pubkey::Pubkey;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+
+/// DataAggregator can be shared between threads with read/write lock access
+#[derive(Clone)]
+pub struct DataAggregator {
+    pub retrieval: Arc<RwLock<Retrieval>>,
+}
+
+impl DataAggregator {
+    pub fn new(retrieval: Retrieval) -> Self {
+        Self {
+            retrieval: Arc::new(RwLock::new(retrieval)),
+        }
+    }
+}
+
+// TODO: helius and database can be abstracted in future to handle
+// different types of APIs and databases
+pub struct Retrieval {
+    pub helius: Helius,
+    pub database: Database,
+}
 
 #[derive(Debug)]
 pub struct Database {
     // Account's public key as string is hashmap key to account data
-    pub data: Option<HashMap<String, AccountData>>,
-}
-
-#[derive(Debug)]
-pub struct AccountData {
-    pub account: Account,
+    pub accounts: HashMap<String, Account>,
     // Signature as string is hashmap key to transaction data
-    pub transactions: Option<HashMap<String, Transaction>>,
+    pub transactions: HashMap<String, Transaction>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Account {
     // Account's public key
     pub account_pubkey: Pubkey,
@@ -30,7 +47,10 @@ pub struct Account {
     pub rent_epoch: u64,
 }
 
-#[derive(Serialize, Debug)]
+// TODO: mapping to everything from EnhancedTransaction that is missing.
+// Especially account_data, instructions, events, token_transfers,
+// also read more about account_data and redesign the current code.
+#[derive(Debug, Clone, Serialize)]
 pub struct Transaction {
     pub signature: String,
     pub timestamp: u64,
@@ -38,11 +58,12 @@ pub struct Transaction {
     pub fee: i32,
     pub fee_payer: String,
     pub slot: i32,
-    // TODO: mapping to everything that is missing. Especially token_transfers,
+    pub native_transfers: Option<Vec<NativeTransfer>>,
+}
 
-    // pub native_transfers: Option<Vec<NativeTransfer>>,
-
-    // // Serializable and deserializable helius transaction data gathered by time of data crawling.
-    // // We want to store all available data that can be reusable in the future if needed.
-    // pub transaction_data: EnhancedTransaction
+#[derive(Debug, Clone, Serialize)]
+pub struct NativeTransfer {
+    pub amount: u64,
+    pub from_user_account: Option<String>,
+    pub to_user_account: Option<String>,
 }
