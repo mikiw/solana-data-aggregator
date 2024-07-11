@@ -1,16 +1,30 @@
-use std::collections::HashMap;
+use anyhow::Error;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 use helius::{
     types::{Cluster, ParseTransactionsRequest},
     Helius,
 };
-use solana_client::{
-    client_error::reqwest::Error, rpc_client::GetConfirmedSignaturesForAddress2Config,
-};
+use solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::types::{Account, AccountData, Database, Transaction};
 
+#[derive(Clone)]
+pub struct Server {
+    pub retrieval: Arc<RwLock<Retrieval>>,
+}
+
+impl Server {
+    pub fn new(retrieval: Retrieval) -> Self {
+        Self {
+            retrieval: Arc::new(RwLock::new(retrieval)),
+        }
+    }
+}
+
+/// Retrieval can be shared between threads with read write lock access
 pub struct Retrieval {
     pub helius: Helius,
     pub database: Database,
@@ -18,11 +32,11 @@ pub struct Retrieval {
 
 impl Retrieval {
     pub fn new() -> Self {
-        let helius =
-            match Helius::new("24cf0798-4008-4c81-aa5e-2875323278cd", Cluster::MainnetBeta) {
-                Ok(helius) => helius,
-                Err(error) => panic!("Cannot establish Helius API connection:: {:?}", error),
-            };
+        let helius = match Helius::new("24cf0798-4008-4c81-aa5e-2875323278cd", Cluster::MainnetBeta)
+        {
+            Ok(helius) => helius,
+            Err(error) => panic!("Cannot establish Helius API connection:: {:?}", error),
+        };
 
         Retrieval {
             helius,
@@ -83,7 +97,7 @@ impl Retrieval {
             );
         }
 
-        let data = AccountData {
+        let account = AccountData {
             account: Account {
                 account_pubkey,
                 owner: account_data.owner,
@@ -94,11 +108,11 @@ impl Retrieval {
             transactions: Some(txs),
         };
 
-        let mut database: HashMap<String, AccountData> = HashMap::new();
-        database.insert(account_pubkey.to_string(), data);
+        let mut data: HashMap<String, AccountData> = HashMap::new();
+        data.insert(account_pubkey.to_string(), account);
 
         // Fill memory database with fetched data
-        self.database.data = Some(database);
+        self.set_database(Database { data: Some(data) }).await?;
 
         // TODO: current_block_height will be helpful later
         // let current_block_height = self.helius.rpc().solana_client.get_block_height().unwrap();
@@ -110,23 +124,46 @@ impl Retrieval {
         Ok(())
     }
 
+    pub async fn set_database(&mut self, db: Database) -> Result<(), Error> {
+        self.database = db;
+        println!("Database set: {:?}", self.database);
+
+        Ok(())
+    }
+
     // TODO: implement monitor data in time
     // pub async fn monitor_data(&self, account_pubkey: Pubkey) -> Result<(), Error> {
     //     Ok(())
     // }
 
-    pub async fn get_account_balance_sol(&self, account_pubkey: String) -> Result<f64, Error> {
-        // TODO: add error handling and remove unwraps
-        let account = self
-            .database
-            .data
-            .as_ref()
-            .unwrap()
-            .get(&account_pubkey.to_string())
-            .unwrap();
-        let sol_balance = account.account.lamports as f64 / 1_000_000_000.0;
+    // pub async fn get_account_transactions_count(&self, account: String) -> Result<usize, Error> {
+    //     match &self.database.data {
+    //         Some(data) => {
+    //             let account = data.get(&account.to_string()).unwrap();
 
-        Ok(sol_balance)
+    //             println!("account.transactions.as_ref().unwrap().len() {:?}", account.transactions.as_ref().unwrap().len());
+    //             let result = account.transactions.as_ref().unwrap().len();
+                
+    //             Ok(result)
+    //         }
+    //         _ => {
+    //             Err(Error::msg("Database is not set!"))
+    //         }
+    //     }
+    // }
+
+    pub async fn get_account_balance_sol(&self, account: String) -> Result<f64, Error> {
+        match &self.database.data {
+            Some(data) => {
+                let account = data.get(&account.to_string()).unwrap();
+                let sol_balance = account.account.lamports as f64 / 1_000_000_000.0;
+
+                Ok(sol_balance)
+            }
+            _ => {
+                Err(Error::msg("Database is not set!"))
+            }
+        }
     }
 
     // TODO: change this to remove account_pubkey and use only tx hash
