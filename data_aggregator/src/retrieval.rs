@@ -1,4 +1,5 @@
 use anyhow::Error;
+use rand::{distributions::Alphanumeric, Rng};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -12,11 +13,11 @@ use solana_sdk::pubkey::Pubkey;
 use crate::types::{Account, AccountData, Database, Transaction};
 
 #[derive(Clone)]
-pub struct Server {
+pub struct DataAggregator {
     pub retrieval: Arc<RwLock<Retrieval>>,
 }
 
-impl Server {
+impl DataAggregator {
     pub fn new(retrieval: Retrieval) -> Self {
         Self {
             retrieval: Arc::new(RwLock::new(retrieval)),
@@ -24,7 +25,7 @@ impl Server {
     }
 }
 
-/// Retrieval can be shared between threads with read write lock access
+/// Retrieval can be shared between threads with read/write lock access
 pub struct Retrieval {
     pub helius: Helius,
     pub database: Database,
@@ -131,26 +132,48 @@ impl Retrieval {
         Ok(())
     }
 
-    // TODO: implement monitor data in time
-    // pub async fn monitor_data(&self, account_pubkey: Pubkey) -> Result<(), Error> {
-    //     Ok(())
-    // }
+    pub async fn database_update(&mut self, account: String) -> Result<(), Error> {
+        let data = self.database.data.as_mut();
+        match data {
+            Some(data) => {
+                let account = data.get_mut(&account.to_string()).unwrap();
+                let dummy_tx = Transaction {
+                    description: "test".to_string(),
+                    fee: 0,
+                    fee_payer: "".to_string(),
+                    signature: "".to_string(),
+                    timestamp: 0,
+                    slot: 0,
+                };
+                let dummy__random_key: String = rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(7)
+                    .map(char::from)
+                    .collect();
 
-    // pub async fn get_account_transactions_count(&self, account: String) -> Result<usize, Error> {
-    //     match &self.database.data {
-    //         Some(data) => {
-    //             let account = data.get(&account.to_string()).unwrap();
+                account
+                    .transactions
+                    .as_mut()
+                    .unwrap()
+                    .insert(dummy__random_key, dummy_tx);
 
-    //             println!("account.transactions.as_ref().unwrap().len() {:?}", account.transactions.as_ref().unwrap().len());
-    //             let result = account.transactions.as_ref().unwrap().len();
+                Ok(())
+            }
+            _ => Err(Error::msg("Database is not set!")),
+        }
+    }
 
-    //             Ok(result)
-    //         }
-    //         _ => {
-    //             Err(Error::msg("Database is not set!"))
-    //         }
-    //     }
-    // }
+    pub async fn get_account_transactions_count(&self, account: String) -> Result<usize, Error> {
+        match &self.database.data {
+            Some(data) => {
+                let account = data.get(&account.to_string()).unwrap();
+                let result = account.transactions.as_ref().unwrap().len();
+
+                Ok(result)
+            }
+            _ => Err(Error::msg("Database is not set!")),
+        }
+    }
 
     pub async fn get_account_balance_sol(&self, account: String) -> Result<f64, Error> {
         match &self.database.data {

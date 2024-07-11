@@ -1,31 +1,18 @@
 use anyhow::Ok;
-use axum::{
-    extract::{Json, Path},
-    http::StatusCode,
-    routing::get,
-    Router,
-};
-use tower_http::timeout::TimeoutLayer;
-
+use axum::{extract::Path, routing::get, Router};
 use futures::future::join_all;
-use retrieval::{Retrieval, Server};
-use serde::{Deserialize, Serialize};
+use retrieval::{DataAggregator, Retrieval};
 use solana_sdk::pubkey::Pubkey;
 use std::time::Duration;
-use std::{future::IntoFuture, net::SocketAddr};
-use std::{
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
 use tokio::task::{self};
 use tokio::time::interval;
-use uuid::Uuid;
+use tower_http::timeout::TimeoutLayer;
 
 mod retrieval;
 mod types;
 
-async fn print_current_balance_from_db(
-    server: Server,
+async fn database_monitor(
+    aggregator: DataAggregator,
     account: String,
     interval_in_sec: u64,
 ) -> Result<(), anyhow::Error> {
@@ -34,19 +21,18 @@ async fn print_current_balance_from_db(
     loop {
         tokio::select! {
                 _ = interval.tick() => {
-                    let retrieval = server.retrieval.read().await;
-                    // let txs_count = retrieval.get_account_transactions_count(account.clone()).await;
-                    // println!("Transactions count: {:?}", txs_count);
-
+                    let retrieval = aggregator.retrieval.read().await;
                     let sol = retrieval.get_account_balance_sol(account.clone()).await;
-                    println!("Current account balance: {:?}", sol);
+                    let txs_count = retrieval.get_account_transactions_count(account.clone()).await;
+
+                    println!("Transactions in DB: {:?} Current Balance: {:?}", txs_count, sol);
             }
         }
     }
 }
 
-async fn monitor_data(
-    server: Server,
+async fn database_update(
+    aggregator: DataAggregator,
     account: String,
     interval_in_sec: u64,
 ) -> Result<(), anyhow::Error> {
@@ -55,7 +41,10 @@ async fn monitor_data(
     loop {
         tokio::select! {
                 _ = interval.tick() => {
-                    println!("Monitor_data: {:?}", 0);
+                    let mut retrieval = aggregator.retrieval.write().await;
+                    retrieval.database_update(account.clone()).await.unwrap();
+
+                    println!("Database updated");
             }
         }
     }
@@ -92,11 +81,15 @@ async fn run_server(close_rx: tokio::sync::oneshot::Receiver<()>) -> Result<(), 
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // TODO: Create a RESTful API layer
-    // TODO: Fix all unwraps
+    // TODO: Comment code and refactor a bit
     // TODO: Add update logic as pooling in time
-    // TODO: add unit and integration tests
-    // TODO: Data Storage (optional)
+    // TODO: Add unit and integration tests
+
+    // TODO: Add Data Storage (optional). I lost a lot of time on tokio/axum problems related to the cargo version,
+    // so I needed to pass data storage layer. Also, I heard that you guys are in a hurry.
+
+    // TODO: Fix all unwraps. Since it's not production ready code I used a lot of unwraps,
+    // but they should be replaced with matches and proper error handling
 
     let mut cli_args = std::env::args();
     let _args = cli_args.next();
@@ -104,10 +97,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let account_pubkey = cli_account_arg.as_str().parse::<Pubkey>().unwrap();
     let account = account_pubkey.to_string();
 
-    let server = Server::new(Retrieval::new());
+    let aggregator = DataAggregator::new(Retrieval::new());
 
-    // Load data to memory
-    server
+    // Load data from API to memory
+    aggregator
         .retrieval
         .write()
         .await
@@ -115,53 +108,27 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .unwrap();
 
-    // let binding = server_mut.database.data.as_mut().unwrap();
-    // let some_random_tx_hash = binding
-    //     .get(&account)
-    //     .unwrap()
-    //     .transactions
-    //     .as_ref()
-    //     .unwrap()
-    //     .values()
-    //     .next()
-    //     .unwrap();
-    // println!(
-    //     "some_random_tx_hash.signature: {:?}",
-    //     some_random_tx_hash.signature
-    // );
-
-    // let tx = server_mut
-    //     .get_transaction(
-    //         account_pubkey.to_string(),
-    //         some_random_tx_hash.signature.clone(),
-    //     )
-    //     .await
-    //     .unwrap();
-    // println!("Full transaction: {:?}", tx);
-
+    // Aggregator background tasks
     let mut tasks = vec![];
 
-    let balance_handle = task::spawn(print_current_balance_from_db(
-        server.clone(),
-        account.clone(),
-        5,
-    ));
-    tasks.push(balance_handle);
-
-    let monitor_handle = task::spawn(monitor_data(server.clone(), account, 5));
+    let monitor_handle = task::spawn(database_monitor(aggregator.clone(), account.clone(), 5));
     tasks.push(monitor_handle);
 
-    print!("start server now...");
+    let update_handle = task::spawn(database_update(aggregator.clone(), account, 5));
+    tasks.push(update_handle);
 
-    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
+    println!("Starting server...");
 
-    // TODO: fix this later, it should be handled with tasks vector and join_all
+    // TODO: Remove later since it's no needed
+    let (_, close_rx) = tokio::sync::oneshot::channel();
+
+    // TODO: This can be fixed. It could be handled with tasks vector and join_all(tasks).
     run_server(close_rx).await?;
 
-    // join all tasks
+    // Join all tasks
     let results = join_all(tasks).await;
 
-    // handle the results of the tasks
+    // Handle the results of the tasks
     for result in results {
         result??;
     }
