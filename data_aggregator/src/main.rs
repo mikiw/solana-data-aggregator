@@ -1,4 +1,5 @@
 use anyhow::Ok;
+use axum::Extension;
 use axum::{extract::Path, routing::get, Router};
 use futures::future::join_all;
 use retrieval::{DataAggregator, Retrieval};
@@ -50,20 +51,28 @@ async fn database_update(
     }
 }
 
-async fn get_account(Path(id): Path<String>) {
+async fn get_account(Extension(aggregator): Extension<DataAggregator>, Path(id): Path<String>) {
+    let retrieval = aggregator.retrieval.read().await;
+    println!("retrieval test: {:?}", retrieval.database.data);
     println!("get_account id: {:?}", id);
 }
 
-async fn get_transaction(Path(id): Path<String>) {
+async fn get_transaction(Extension(aggregator): Extension<DataAggregator>, Path(id): Path<String>) {
+    let retrieval = aggregator.retrieval.read().await;
+    println!("retrieval test: {:?}", retrieval.database.data);
     println!("get_transaction id: {:?}", id);
 }
 
-async fn run_server(close_rx: tokio::sync::oneshot::Receiver<()>) -> Result<(), anyhow::Error> {
+//     aggregator: DataAggregator,
+async fn run_server(
+    close_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<(), anyhow::Error> {
     let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
+        .route("/", get(|| async { "Pong!" }))
         .route("/account/:id", get(get_account))
         .route("/transaction/:id", get(get_transaction))
-        .layer(TimeoutLayer::new(Duration::from_secs(1)));
+        .layer(TimeoutLayer::new(Duration::from_secs(5)));
+        // .layer(Extension(aggregator));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
@@ -75,13 +84,17 @@ async fn run_server(close_rx: tokio::sync::oneshot::Receiver<()>) -> Result<(), 
         })
         .await
         .unwrap();
+    
+    println!("Server started!");
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // TODO: Add database instance to axum get functions
     // TODO: Comment code and refactor a bit
+    // TODO: Write readme
     // TODO: Add update logic as pooling in time
     // TODO: Add unit and integration tests
 
@@ -111,10 +124,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // Aggregator background tasks
     let mut tasks = vec![];
 
-    let monitor_handle = task::spawn(database_monitor(aggregator.clone(), account.clone(), 5));
+    let monitor_handle = task::spawn(database_monitor(aggregator.clone(), account.clone(), 3));
     tasks.push(monitor_handle);
 
-    let update_handle = task::spawn(database_update(aggregator.clone(), account, 5));
+    let update_handle = task::spawn(database_update(aggregator.clone(), account, 6));
     tasks.push(update_handle);
 
     println!("Starting server...");
@@ -123,6 +136,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (_, close_rx) = tokio::sync::oneshot::channel();
 
     // TODO: This can be fixed. It could be handled with tasks vector and join_all(tasks).
+    // run_server(aggregator.clone(), close_rx).await?;
     run_server(close_rx).await?;
 
     // Join all tasks
