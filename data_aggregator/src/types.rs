@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
 use helius::Helius;
 use serde::Serialize;
 use solana_sdk::pubkey::Pubkey;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
 /// DataAggregator can be shared between threads with read/write lock access
@@ -18,7 +18,8 @@ impl DataAggregator {
     }
 }
 
-// TODO: helius and database can be abstracted in future to handle different types of APIs and databases
+// TODO: helius and database can be abstracted in future to handle
+// different types of APIs and databases
 pub struct Retrieval {
     pub helius: Helius,
     pub database: Database,
@@ -27,14 +28,9 @@ pub struct Retrieval {
 #[derive(Debug)]
 pub struct Database {
     // Account's public key as string is hashmap key to account data
-    pub data: Option<HashMap<String, AccountData>>,
-}
-
-#[derive(Debug)]
-pub struct AccountData {
-    pub account: Account,
+    pub accounts: HashMap<String, Account>,
     // Signature as string is hashmap key to transaction data
-    pub transactions: Option<HashMap<String, Transaction>>,
+    pub transactions: HashMap<String, Transaction>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -52,7 +48,8 @@ pub struct Account {
 }
 
 // TODO: mapping to everything from EnhancedTransaction that is missing.
-// Especially account_data, instructions, events, token_transfers
+// Especially account_data, instructions, events, token_transfers,
+// also read more about account_data and redesign the current code.
 #[derive(Debug, Clone, Serialize)]
 pub struct Transaction {
     pub signature: String,

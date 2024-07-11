@@ -1,40 +1,63 @@
 use anyhow::Error;
-use rand::{distributions::Alphanumeric, Rng};
-use std::collections::HashMap;
 use helius::{
     types::{Cluster, ParseTransactionsRequest},
     Helius,
 };
-use solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
+use indexmap::IndexMap;
 use solana_sdk::pubkey::Pubkey;
+use std::collections::HashMap;
 
-use crate::types::{Account, AccountData, Database, NativeTransfer, Retrieval, Transaction};
+use crate::types::{Account, Database, NativeTransfer, Retrieval, Transaction};
 
 impl Retrieval {
     pub fn new() -> Self {
-        // Since it's private repo api_key can he here, once it will change for public
-        // this api_key needs to be deprecated on Helius page
+        // Since this is a private repo, the api_key can be included here. Once it becomes public,
+        // this api_key needs to be deprecated on the Helius page.
         let helius = match Helius::new("24cf0798-4008-4c81-aa5e-2875323278cd", Cluster::MainnetBeta)
         {
             Ok(helius) => helius,
-            Err(error) => panic!("Cannot establish Helius API connection:: {:?}", error),
+            Err(error) => panic!("Cannot establish Helius API connection: {:?}", error),
         };
 
         Retrieval {
             helius,
-            database: Database { data: None },
+            database: Database {
+                accounts: HashMap::new(),
+                transactions: HashMap::new(),
+            },
         }
     }
 
-    // Function is loading data from API to memory.
-    // This might change in future once the database layer is added.
-    //
-    // Currently the whole workflow of the program is based on account tracking,
-    // this is why we need pass account_pubkey.
-    //
-    // TODO: Later remove account_pubkey and adapt to crawling by block, same as blockchain indexers works.
-    pub async fn load_data(&mut self, account_pubkey: Pubkey) -> Result<(), Error> {
-        // TODO: Change self.helius.rpc() to async/await
+    pub async fn get_account_balances(&self) -> Result<IndexMap<String, f64>, Error> {
+        // IndexMap is here to persist order of elements in logs
+        let balances: IndexMap<String, f64> = self
+            .database
+            .accounts
+            .iter()
+            .map(|(_, account)| {
+                (
+                    account.account_pubkey.to_string().clone(),
+                    account.lamports as f64 / 1_000_000_000.0,
+                )
+            })
+            .collect();
+
+        Ok(balances)
+    }
+
+    pub async fn get_account_count(&self) -> Result<usize, Error> {
+        Ok(self.database.accounts.len())
+    }
+
+    pub async fn update_accounts(&mut self) -> Result<(), Error> {
+        // TODO: Implement update_accounts for accounts
+
+        Ok(())
+    }
+
+    pub async fn fetch_account(&mut self, account_id: String) -> Result<Account, Error> {
+        let account_pubkey = account_id.as_str().parse::<Pubkey>().unwrap();
+        // TODO: replace helius.rpc().solana_client with async/await function
         let account_data = self
             .helius
             .rpc()
@@ -42,185 +65,90 @@ impl Retrieval {
             .get_account(&account_pubkey)
             .unwrap();
 
-        // TODO: signature_config can be used to crawl data for more than 10 transactions
-        let signature_config = GetConfirmedSignaturesForAddress2Config {
-            before: None,
-            until: None,
-            limit: Some(2), // Limit to the last 2 transactions
-            commitment: None,
+        let updated_account = Account {
+            account_pubkey,
+            owner: account_data.owner,
+            lamports: account_data.lamports,
+            executable: account_data.executable,
+            rent_epoch: account_data.rent_epoch,
         };
 
-        let signatures = self
-            .helius
-            .rpc()
-            .solana_client
-            .get_signatures_for_address_with_config(&account_pubkey, signature_config);
+        self.database
+            .accounts
+            .insert(account_id, updated_account.clone());
 
-        let request_signatures: Vec<String> = signatures
+        Ok(updated_account)
+    }
+
+    pub async fn get_account(&self, account_id: String) -> Result<Account, Error> {
+        Ok(self
+            .database
+            .accounts
+            .get(&account_id.to_string())
             .unwrap()
-            .iter()
-            .map(|tx| tx.signature.clone())
+            .clone())
+    }
+
+    pub async fn account_exists(&self, account_id: String) -> Result<bool, Error> {
+        Ok(self.database.accounts.contains_key(&account_id))
+    }
+
+    pub async fn get_transaction_count(&self) -> Result<usize, Error> {
+        Ok(self.database.transactions.len())
+    }
+
+    pub async fn fetch_transaction(&mut self, tx_signature: String) -> Result<Transaction, Error> {
+        let request: ParseTransactionsRequest = ParseTransactionsRequest {
+            transactions: vec![tx_signature],
+        };
+        let response = &self.helius.parse_transactions(request).await.unwrap()[0];
+
+        let native_transfers = response
+            .native_transfers
+            .as_ref()
+            .unwrap()
+            .into_iter()
+            .map(|native_transfer| NativeTransfer {
+                amount: native_transfer.amount.as_u64().unwrap(),
+                from_user_account: native_transfer.user_accounts.from_user_account.clone(),
+                to_user_account: native_transfer.user_accounts.to_user_account.clone(),
+            })
             .collect();
 
-        let request = ParseTransactionsRequest {
-            transactions: request_signatures,
+        let transaction = Transaction {
+            signature: response.signature.clone(),
+            timestamp: response.timestamp,
+            description: response.description.clone(),
+            fee: response.fee,
+            fee_payer: response.fee_payer.clone(),
+            slot: response.slot,
+            native_transfers: Some(native_transfers),
         };
 
-        let mut transactions: HashMap<String, Transaction> = HashMap::new();
-        
-        let response = self.helius.parse_transactions(request).await.unwrap();
-
-        // TODO: change for to map
-        for transaction in response {
-
-            let native_transfers = transaction.native_transfers.unwrap().into_iter().map(|native_transfer| {
-                NativeTransfer {
-                    amount: native_transfer.amount.as_u64().unwrap(),
-                    from_user_account: native_transfer.user_accounts.from_user_account,
-                    to_user_account: native_transfer.user_accounts.to_user_account,
-                }
-            }).collect();
-
-            transactions.insert(
-                transaction.signature.clone(),
-                Transaction {
-                    signature: transaction.signature.clone(),
-                    timestamp: transaction.timestamp,
-                    description: transaction.description.clone(),
-                    fee: transaction.fee,
-                    fee_payer: transaction.fee_payer.clone(),
-                    slot: transaction.slot,
-                    native_transfers: Some(native_transfers),
-                },
-            );
-        }
-
-        let account = AccountData {
-            account: Account {
-                account_pubkey,
-                owner: account_data.owner,
-                lamports: account_data.lamports,
-                executable: account_data.executable,
-                rent_epoch: account_data.rent_epoch,
-            },
-            transactions: Some(transactions),
-        };
-
-        let mut data: HashMap<String, AccountData> = HashMap::new();
-        data.insert(account_pubkey.to_string(), account);
-
-        // Fill memory database with fetched data
-        self.set_database(Database { data: Some(data) }).await?;
-
-        Ok(())
-    }
-
-    pub async fn set_database(&mut self, db: Database) -> Result<(), Error> {
-        self.database = db;
-        println!("Database set: {:?}", self.database);
-
-        Ok(())
-    }
-
-    pub async fn database_update(&mut self, account: String) -> Result<(), Error> {
-        // TODO: This can be also done with helios hooks but for demo I'll use pooling.
-        // TODO: Implement database update
-        
-        // TODO: current_block_height will be helpful later
-        // let current_block_height = self.helius.rpc().solana_client.get_block_height().unwrap();
-        // println!("current_block_height: {:?}", current_block_height);
-
-        // let block = self.helius.rpc()
-        //     .solana_client.get_block(current_block_height - 10).unwrap();
-        // println!("block: {:?}", block);
-
-        let data = self.database.data.as_mut();
-        match data {
-            Some(data) => {
-                let account = data.get_mut(&account.to_string()).unwrap();
-                let dummy_tx = Transaction {
-                    description: "test".to_string(),
-                    fee: 0,
-                    fee_payer: "".to_string(),
-                    signature: "".to_string(),
-                    timestamp: 0,
-                    slot: 0,
-                    native_transfers: None,
-                };
-                let dummy_random_key: String = rand::thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(7)
-                    .map(char::from)
-                    .collect();
-
-                account
-                    .transactions
-                    .as_mut()
-                    .unwrap()
-                    .insert(dummy_random_key, dummy_tx);
-
-                Ok(())
-            }
-            _ => Err(Error::msg("Database is not set!")),
-        }
-    }
-
-    pub async fn get_account_transactions_count(&self, account: String) -> Result<usize, Error> {
-        match &self.database.data {
-            Some(data) => {
-                let account = data.get(&account.to_string()).unwrap();
-                let transactions_count = account.transactions.as_ref().unwrap().len();
-
-                Ok(transactions_count)
-            }
-            _ => Err(Error::msg("Database is not set!")),
-        }
-    }
-
-    pub async fn get_account_balance_sol(&self, account: String) -> Result<f64, Error> {
-        match &self.database.data {
-            Some(data) => {
-                let account = data.get(&account.to_string()).unwrap();
-                let sol_balance = account.account.lamports as f64 / 1_000_000_000.0;
-
-                Ok(sol_balance)
-            }
-            _ => Err(Error::msg("Database is not set!")),
-        }
-    }
-
-    pub async fn get_account(&self, account: String) -> Result<Account, Error> {
-        match &self.database.data {
-            Some(data) => {
-                let account = data.get(&account.to_string()).unwrap();
-
-                Ok(account.account.clone())
-            }
-            _ => Err(Error::msg("Database is not set!")),
-        }
-    }
-
-    // TODO: Later remove account_pubkey and adapt to crawling by block, same as blockchain indexers works.
-    pub async fn get_transaction(
-        &self,
-        account_pubkey: String,
-        tx_hash: String,
-    ) -> Result<Transaction, Error> {
-        let account = self
-            .database
-            .data
-            .as_ref()
-            .unwrap()
-            .get(&account_pubkey.to_string())
-            .unwrap();
-
-        let transaction = account
+        self.database
             .transactions
-            .as_ref()
-            .unwrap()
-            .get(&tx_hash)
-            .unwrap();
+            .insert(response.signature.clone(), transaction.clone());
 
-        Ok(transaction.clone())
+        Ok(transaction)
     }
+
+    pub async fn get_transaction(&self, tx_signature: String) -> Result<Transaction, Error> {
+        Ok(self
+            .database
+            .transactions
+            .get(&tx_signature)
+            .unwrap()
+            .clone())
+    }
+
+    pub async fn transaction_exists(&self, tx_hash: String) -> Result<bool, Error> {
+        Ok(self.database.transactions.contains_key(&tx_hash))
+    }
+
+    // TODO: Implement update_transactions based on some criteria.
+    // This can also be achieved by crawling block by block
+    // from a certain block height, similar to normal block indexers.
+    // pub async fn update_transactions(&mut self) -> Result<(), Error> {
+    //     Ok(())
+    // }
 }
