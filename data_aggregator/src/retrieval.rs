@@ -50,7 +50,14 @@ impl Retrieval {
     }
 
     pub async fn update_accounts(&mut self) -> Result<(), Error> {
-        // TODO: Implement update_accounts for accounts
+        let account_keys: Vec<String> = self.database.accounts.keys().cloned().collect();
+
+        // TODO: This implementation is based on naive assumptions and is suitable only for a small number of accounts.
+        // For production, implement a robust querying logic (get_multiple_accounts() can be used).)
+        for account_id in account_keys
+        {
+            self.fetch_account(account_id).await?;
+        }
 
         Ok(())
     }
