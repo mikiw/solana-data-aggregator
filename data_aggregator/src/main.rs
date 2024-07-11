@@ -63,20 +63,22 @@ async fn get_transaction(Extension(aggregator): Extension<DataAggregator>, Path(
     println!("get_transaction id: {:?}", id);
 }
 
-//     aggregator: DataAggregator,
 async fn run_server(
+    aggregator: DataAggregator,
     close_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<(), anyhow::Error> {
     let app = Router::new()
         .route("/", get(|| async { "Pong!" }))
         .route("/account/:id", get(get_account))
         .route("/transaction/:id", get(get_transaction))
-        .layer(TimeoutLayer::new(Duration::from_secs(5)));
-        // .layer(Extension(aggregator));
+        .layer(TimeoutLayer::new(Duration::from_secs(5)))
+        .layer(Extension(aggregator));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .unwrap();
+
+    println!("Starting server...");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -84,8 +86,6 @@ async fn run_server(
         })
         .await
         .unwrap();
-    
-    println!("Server started!");
 
     Ok(())
 }
@@ -130,14 +130,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let update_handle = task::spawn(database_update(aggregator.clone(), account, 6));
     tasks.push(update_handle);
 
-    println!("Starting server...");
 
     // TODO: Remove later since it's no needed
-    let (_, close_rx) = tokio::sync::oneshot::channel();
+    let (close_tx, close_rx) = tokio::sync::oneshot::channel();
 
     // TODO: This can be fixed. It could be handled with tasks vector and join_all(tasks).
-    // run_server(aggregator.clone(), close_rx).await?;
-    run_server(close_rx).await?;
+    run_server(aggregator.clone(), close_rx).await?;
 
     // Join all tasks
     let results = join_all(tasks).await;
