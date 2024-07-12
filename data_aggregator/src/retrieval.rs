@@ -91,7 +91,7 @@ impl Retrieval {
     pub async fn get_account(&self, account_id: String) -> Result<Account, Error> {
         match self.database.accounts.get(&account_id) {
             Some(account) => Ok(account.clone()),
-            None => Err(Error::msg("Account not found")),
+            None => Err(Error::msg("Account not found.")),
         }
     }
 

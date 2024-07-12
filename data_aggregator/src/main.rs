@@ -6,7 +6,7 @@ mod types;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // TODO: Add Data Storage (optional).
+    // TODO: Add Persistent Data Storage (optional).
     // TODO: Add more complicated test scenarios in data_aggregator_tests, for example:
     // many transactions in one test, many accounts in one test, tests with fn update_accounts().
     // TODO: Add server integration tests. Probably use the release version and start as the process.
@@ -99,7 +99,7 @@ mod data_aggregator_tests {
             .await;
         assert!(account.is_err());
         let error_message = format!("{}", account.err().unwrap());
-        assert_eq!(error_message, "Account not found");
+        assert_eq!(error_message, "Account not found.");
 
         retrieval
             .fetch_account(ACTIVE_MAINNET_ACCOUNT.to_string())
@@ -124,7 +124,7 @@ mod data_aggregator_tests {
         let account = retrieval.get_account(USDC_CONTRACT.to_string()).await;
         assert!(account.is_err());
         let error_message = format!("{}", account.err().unwrap());
-        assert_eq!(error_message, "Account not found");
+        assert_eq!(error_message, "Account not found.");
 
         retrieval
             .fetch_account(USDC_CONTRACT.to_string())
