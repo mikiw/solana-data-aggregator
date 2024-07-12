@@ -1,9 +1,6 @@
 # Solana Data Aggregator
 Solana Data Aggregator is a lightweight middleware layer that integrates Solana's RPC Nodes and APIs like [Helius](https://www.helius.dev/) with indoor API systems.
 
-## 🌐 Documentation
-TODO:
-
 ## Implementation
 I decided to implement [axum](https://crates.io/crates/axum) server as a RESTful API layer since I'm already familiar with that and I think that it's the most tested cargo for that purpose.
 
@@ -68,8 +65,29 @@ Response
 {"signature":"5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ","timestamp":1720605742,"description":"","fee":5001,"fee_payer":"38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus","slot":276738369,"native_transfers":[{"amount":2039280,"from_user_account":"71eXHafHQ5mDf4ZeA1FPKsKQFR32TMQsq3wukuwyTSDe","to_user_account":"38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus"}]}
 ```
 
-## Postman testing examples
-TODO:
+## Postman testing example
+
+Firstly run server in terminal.
+![Terminal](./doc/11-terminal.jpg)
+
+Check if server is running.
+![Postman ping](./doc/2-postman-ping.jpg)
+
+Find active Solana account on mainnet for example `3sZA1qjF4GBr1XnvFTbU5HXkxpYKRdf1LRvmXqvyuZiK` and try to get account data.
+![Explorer account](./doc/3-explorer-account.png)
+
+Since there is no account in memory database it should be fetched and stored in memory database.
+![Postman fetch account](./doc/4-postman-fetch-account.jpg)
+
+Wait a while and check updated balance in SOL, for active account balance should change.
+![Balance updated](./doc/5-balance-updated.jpg)
+
+Find Solana transaction on mainnet for example `4J3w44KSTsykeSiWPDrceCVN38grcz1ng6TEfRi1DUMeB9hiXETmmEUUjr1tL7KzQTsysxRs6cC1G2TNcWvqJnrE` and fetch it in postman.
+![Explorer transaction](./doc/6-explorer-transaction.png)
+![Postman fetch transaction](./doc/7-transaction-fetch.png)
+
+You can also check DB cache status
+![Postman fetch transaction](./doc/8-transaction-account-status.jpg)
 
 ## Tests
 `data_aggregator_tests` tests requires internet connection to fetch data from Helius API, to run test simply execute:
@@ -86,3 +104,5 @@ cargo +nightly fmt --all
 cargo clippy --all -- -D warnings
 cargo clippy --tests -- -D warnings
 ```
+
+PRs are welcome 😄
