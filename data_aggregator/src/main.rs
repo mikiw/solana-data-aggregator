@@ -8,7 +8,6 @@ mod types;
 async fn main() -> Result<(), anyhow::Error> {
     // TODO: Comment code and refactor a bit, check again.
     // TODO: Write readme add screens from solana explorer, terminal.
-    // TODO: Add retrieval tests: native_transfers transaction.
 
     // TODO: Add Data Storage (optional).
     // TODO: Add more complicated test scenarios in data_aggregator_tests, for example:
@@ -23,16 +22,16 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
 // TODO: Move this to newly created test folder
 #[cfg(test)]
 mod data_aggregator_tests {
     use solana_sdk::pubkey::Pubkey;
 
-    use crate::types::{DataAggregator, NativeTransfer, Retrieval};
+    use crate::types::{DataAggregator, Retrieval};
 
     const ACTIVE_MAINNET_ACCOUNT: &str = "BEmUSjqs7mpgaSXw6QdrePfTsD8aQHbdtnqUxa63La6E";
-    const TRANSACTION_WITH_NATIVE_TRANSFERS: &str = "5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ";
+    const TRANSACTION_WITH_NATIVE_TRANSFERS: &str =
+        "5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ";
     const USDC_CONTRACT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
     const USDC_TRANSACTION: &str =
         "3QGpxQhhDU2ijTnQhBEjYj28judQg7Ymrn5jZxMTmNKXqDSj2jSwNTB7Tfau6tkSF5rA7nT57HPbVeAxF9zpv25b";
@@ -62,7 +61,7 @@ mod data_aggregator_tests {
             .account_exists(ACTIVE_MAINNET_ACCOUNT.to_string())
             .await
             .unwrap();
-        assert_eq!(exists, false);
+        assert!(!exists);
 
         retrieval
             .fetch_account(ACTIVE_MAINNET_ACCOUNT.to_string())
@@ -73,7 +72,7 @@ mod data_aggregator_tests {
             .account_exists(ACTIVE_MAINNET_ACCOUNT.to_string())
             .await
             .unwrap();
-        assert_eq!(exists, true);
+        assert!(exists);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -211,7 +210,7 @@ mod data_aggregator_tests {
             .transaction_exists(USDC_TRANSACTION.to_string())
             .await
             .unwrap();
-        assert_eq!(exists, false);
+        assert!(!exists);
 
         retrieval
             .fetch_transaction(USDC_TRANSACTION.to_string())
@@ -222,7 +221,7 @@ mod data_aggregator_tests {
             .transaction_exists(USDC_TRANSACTION.to_string())
             .await
             .unwrap();
-        assert_eq!(exists, true);
+        assert!(exists);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -291,12 +290,21 @@ mod data_aggregator_tests {
         );
         assert_eq!(transaction.slot, 276738369);
 
-        let native_transfers = transaction.native_transfers.as_ref().expect("Expected some native transfers");
+        let native_transfers = transaction
+            .native_transfers
+            .as_ref()
+            .expect("Expected some native transfers");
         assert_eq!(native_transfers.len(), 1);
 
         let native_transfer = &native_transfers[0];
         assert_eq!(native_transfer.amount, 2039280);
-        assert_eq!(native_transfer.from_user_account, Some("71eXHafHQ5mDf4ZeA1FPKsKQFR32TMQsq3wukuwyTSDe".to_string()));
-        assert_eq!(native_transfer.to_user_account, Some("38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus".to_string()));
+        assert_eq!(
+            native_transfer.from_user_account,
+            Some("71eXHafHQ5mDf4ZeA1FPKsKQFR32TMQsq3wukuwyTSDe".to_string())
+        );
+        assert_eq!(
+            native_transfer.to_user_account,
+            Some("38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus".to_string())
+        );
     }
 }
