@@ -6,9 +6,6 @@ mod types;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // TODO: Comment code and refactor a bit, check again.
-    // TODO: Write readme add screens from solana explorer, terminal.
-
     // TODO: Add Data Storage (optional).
     // TODO: Add more complicated test scenarios in data_aggregator_tests, for example:
     // many transactions in one test, many accounts in one test, tests with fn update_accounts().
