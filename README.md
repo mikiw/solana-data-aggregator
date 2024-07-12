@@ -22,6 +22,7 @@ Once server is running you can target 3 endpoints:
 Get 127.0.0.1:3000
 ```
 
+Response
 ```
 "Ping? Pong!"
 ```
@@ -33,6 +34,7 @@ Get 127.0.0.1:3000
 Get 127.0.0.1:3000/account/
 ```
 
+Response
 ```
 {"account_pubkey":[152,27,180,172,64,226,227,125,52,213,203,172,8,187,91,161,148,242,38,146,127,41,121,94,139,92,180,217,130,95,224,203],"lamports":25625559441,"owner":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"executable":false,"rent_epoch":18446744073709551615}
 ```
@@ -44,6 +46,7 @@ Get 127.0.0.1:3000/account/
 Get 127.0.0.1:3000/transaction/5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ
 ```
 
+Response
 ```
 {"signature":"5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ","timestamp":1720605742,"description":"","fee":5001,"fee_payer":"38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus","slot":276738369,"native_transfers":[{"amount":2039280,"from_user_account":"71eXHafHQ5mDf4ZeA1FPKsKQFR32TMQsq3wukuwyTSDe","to_user_account":"38tFiQmLwmzUHYiCrYKH4pumqWxpdaYvErUsJbmeSZus"}]}
 ```
