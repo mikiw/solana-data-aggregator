@@ -1,5 +1,5 @@
 # Solana Data Aggregator
-Solana Data Aggregator is a lightweight middleware layer that integrates Solana's RPC Nodes and APIs like [Helius](https://www.helius.dev/) with indoor API systems.
+Solana Data Aggregator is a lightweight middleware layer that integrates Solana's RPC Nodes and APIs like [Helius](https://www.helius.dev/) with indoor APIs systems.
 
 ## Implementation
 I decided to implement [axum](https://crates.io/crates/axum) server as a RESTful API layer since I'm already familiar with that and I think that it's the most tested cargo for that purpose.
@@ -68,7 +68,7 @@ Response
 ## Postman testing example
 
 Firstly run server in terminal.
-![Terminal](./doc/11-terminal.jpg)
+![Terminal](./doc/1-terminal.jpg)
 
 Check if server is running.
 ![Postman ping](./doc/2-postman-ping.jpg)
