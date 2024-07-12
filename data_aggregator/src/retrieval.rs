@@ -87,12 +87,10 @@ impl Retrieval {
     }
 
     pub async fn get_account(&self, account_id: String) -> Result<Account, Error> {
-        Ok(self
-            .database
-            .accounts
-            .get(&account_id.to_string())
-            .unwrap()
-            .clone())
+        match self.database.accounts.get(&account_id) {
+            Some(account) => Ok(account.clone()),
+            None => Err(Error::msg("Account not found")),
+        }
     }
 
     pub async fn account_exists(&self, account_id: String) -> Result<bool, Error> {
@@ -139,12 +137,10 @@ impl Retrieval {
     }
 
     pub async fn get_transaction(&self, tx_signature: String) -> Result<Transaction, Error> {
-        Ok(self
-            .database
-            .transactions
-            .get(&tx_signature)
-            .unwrap()
-            .clone())
+        match self.database.transactions.get(&tx_signature) {
+            Some(transaction) => Ok(transaction.clone()),
+            None => Err(Error::msg("Transaction not found")),
+        }
     }
 
     pub async fn transaction_exists(&self, tx_hash: String) -> Result<bool, Error> {
