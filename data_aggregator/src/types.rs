@@ -27,9 +27,9 @@ pub struct Retrieval {
 
 #[derive(Debug)]
 pub struct Database {
-    // Account's public key as string is hashmap key to account data
+    // Account's public key as a string is the hashmap key for account data
     pub accounts: HashMap<String, Account>,
-    // Signature as string is hashmap key to transaction data
+    // The signature as a string serves as the hashmap key for transaction data
     pub transactions: HashMap<String, Transaction>,
 }
 
@@ -47,7 +47,7 @@ pub struct Account {
     pub rent_epoch: u64,
 }
 
-// TODO: mapping to everything from EnhancedTransaction that is missing.
+// TODO: Add mappings to everything from EnhancedTransaction that is missing.
 // Especially account_data, instructions, events, token_transfers,
 // also read more about account_data and redesign the current code.
 #[derive(Debug, Clone, Serialize)]

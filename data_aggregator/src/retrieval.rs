@@ -62,14 +62,16 @@ impl Retrieval {
     }
 
     pub async fn fetch_account(&mut self, account_id: String) -> Result<Account, Error> {
-        let account_pubkey = account_id.as_str().parse::<Pubkey>().unwrap();
+        let account_pubkey = account_id
+            .as_str()
+            .parse::<Pubkey>()
+            .expect("Account pubkey cannot be parsed.");
         // TODO: replace helius.rpc().solana_client with async/await function
         let account_data = self
             .helius
             .rpc()
             .solana_client
-            .get_account(&account_pubkey)
-            .unwrap();
+            .get_account(&account_pubkey)?;
 
         let updated_account = Account {
             account_pubkey,
@@ -87,12 +89,10 @@ impl Retrieval {
     }
 
     pub async fn get_account(&self, account_id: String) -> Result<Account, Error> {
-        Ok(self
-            .database
-            .accounts
-            .get(&account_id.to_string())
-            .unwrap()
-            .clone())
+        match self.database.accounts.get(&account_id) {
+            Some(account) => Ok(account.clone()),
+            None => Err(Error::msg("Account not found.")),
+        }
     }
 
     pub async fn account_exists(&self, account_id: String) -> Result<bool, Error> {
@@ -107,15 +107,18 @@ impl Retrieval {
         let request: ParseTransactionsRequest = ParseTransactionsRequest {
             transactions: vec![tx_signature],
         };
-        let tx_response = &self.helius.parse_transactions(request).await.unwrap()[0];
+        let tx_response = &self.helius.parse_transactions(request).await?[0];
 
         let native_transfers = tx_response
             .native_transfers
             .as_ref()
-            .unwrap()
+            .expect("Native transfers cannot be parsed.")
             .iter()
             .map(|native_transfer| NativeTransfer {
-                amount: native_transfer.amount.as_u64().unwrap(),
+                amount: native_transfer
+                    .amount
+                    .as_u64()
+                    .expect("Amount cannot be parsed."),
                 from_user_account: native_transfer.user_accounts.from_user_account.clone(),
                 to_user_account: native_transfer.user_accounts.to_user_account.clone(),
             })
@@ -139,12 +142,10 @@ impl Retrieval {
     }
 
     pub async fn get_transaction(&self, tx_signature: String) -> Result<Transaction, Error> {
-        Ok(self
-            .database
-            .transactions
-            .get(&tx_signature)
-            .unwrap()
-            .clone())
+        match self.database.transactions.get(&tx_signature) {
+            Some(transaction) => Ok(transaction.clone()),
+            None => Err(Error::msg("Transaction not found")),
+        }
     }
 
     pub async fn transaction_exists(&self, tx_hash: String) -> Result<bool, Error> {
