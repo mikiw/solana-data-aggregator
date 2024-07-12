@@ -5,17 +5,18 @@ Solana Data Aggregator is a lightweight middleware layer that integrates Solana'
 TODO:
 
 ## Implementation
-I decided to implement [axum](https://crates.io/crates/axum) server as a RESTful API layer since I'm already familiar with that and I with it's the most tested cargo for that purpose.
+I decided to implement [axum](https://crates.io/crates/axum) server as a RESTful API layer since I'm already familiar with that and I think that it's the most tested cargo for that purpose.
 
-Entrypoint for program is `main()` function that is executing `run_server()` function that it's running [axum](https://crates.io/crates/axum) server and also relevant background tasks like `server_log` (that prints server status once every 3 second) and `server_monitor` (that updates accounts SOL balance once every 6 seconds).
+Entrypoint for program is `main()` function that is executing `run_server()` function that it's running [axum](https://crates.io/crates/axum) server and also relevant background tasks like `server_log` (that prints server status once every 3 second) and `server_monitor` (that updates tracked accounts with SOL balance once every 6 seconds).
 
 As a lightweight middleware API layer our server is fetching data from [Helius API](https://www.helius.dev/) and store it in local memory database.
 
-This approach is easy and convenient for now but in future, some crawling mechanisms like fetching transaction data block by block can be implemented (similar to block indexers).
+This approach is easy and convenient for now but in future, some crawling mechanisms like fetching transaction data block by block or with some criteria can be implemented (similar to block indexers). Since accepted transactions on Solana are immutable only account data can be updated with the `server_monitor` background task.
 
 Once server is running you can target 3 endpoints:
 
-Server testing endpoint
+### Server testing endpoint
+
 /
 ```
 Get 127.0.0.1:3000
@@ -25,7 +26,8 @@ Get 127.0.0.1:3000
 "Ping? Pong!"
 ```
 
-Account fetching
+### Account fetching
+
 /account/:account_id
 ```
 Get 127.0.0.1:3000/account/
@@ -35,7 +37,8 @@ Get 127.0.0.1:3000/account/
 {"account_pubkey":[152,27,180,172,64,226,227,125,52,213,203,172,8,187,91,161,148,242,38,146,127,41,121,94,139,92,180,217,130,95,224,203],"lamports":25625559441,"owner":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"executable":false,"rent_epoch":18446744073709551615}
 ```
 
-Transaction fetching
+### Transaction fetching
+
 /transaction/:tx_signature
 ```
 Get 127.0.0.1:3000/transaction/5XiFRQDYp31KxFQtJqqrjTduTZnGaEWffmv4941D34VsX2GpYavU69bpn1xwWtrcS7fE7D5KuXCjpqjQwLHHeifZ
