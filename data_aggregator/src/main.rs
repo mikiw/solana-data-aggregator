@@ -289,7 +289,7 @@ mod data_aggregator_tests {
         let native_transfers = transaction
             .native_transfers
             .as_ref()
-            .expect("Expected some native transfers");
+            .expect("Expected some native transfers.");
         assert_eq!(native_transfers.len(), 1);
 
         let native_transfer = &native_transfers[0];
