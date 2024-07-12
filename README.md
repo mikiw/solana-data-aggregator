@@ -9,7 +9,7 @@ I decided to implement [axum](https://crates.io/crates/axum) server as a RESTful
 
 Entrypoint for program is `main()` function that is executing `run_server()` function that it's running [axum](https://crates.io/crates/axum) server and also relevant background tasks like `server_log` (that prints server status once every 3 second) and `server_monitor` (that updates tracked accounts with SOL balance once every 6 seconds).
 
-As a lightweight middleware API layer our server is fetching data from [Helius API](https://www.helius.dev/) and store it in local memory database.
+As a lightweight middleware API layer our server is fetching data from [Helius API](https://www.helius.dev/) and store it in local memory database. Responsible business logic is in `impl Retrieval`.
 
 This approach is easy and convenient for now but in future, some crawling mechanisms like fetching transaction data block by block or with some criteria can be implemented (similar to block indexers). Since accepted transactions on Solana are immutable only account data can be updated with the `server_monitor` background task.
 
@@ -55,9 +55,7 @@ Response
 TODO:
 
 ## Tests
-`data_aggregator_tests` tests requires internet connection to fetch data from Helius API
-
-To run test simply execute:
+`data_aggregator_tests` tests requires internet connection to fetch data from Helius API, to run test simply execute:
 ```
 cargo test
 ```
