@@ -14,8 +14,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // many transactions in one test, many accounts in one test, tests with fn update_accounts().
     // TODO: Add server integration tests. Probably use the release version and start as the process.
     // TODO: Add load tests with more data.
-    // TODO: Fix all unwraps. Since this is not production-ready code, I used a lot of unwraps,
-    // but they should be replaced with match statements and proper error propagation and handling.
+    // TODO: Check again error handling and propagations with more tests.
 
     run_server().await?;
 

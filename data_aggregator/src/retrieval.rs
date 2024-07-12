@@ -62,14 +62,16 @@ impl Retrieval {
     }
 
     pub async fn fetch_account(&mut self, account_id: String) -> Result<Account, Error> {
-        let account_pubkey = account_id.as_str().parse::<Pubkey>().unwrap();
+        let account_pubkey = account_id
+            .as_str()
+            .parse::<Pubkey>()
+            .expect("Account pubkey cannot be parsed.");
         // TODO: replace helius.rpc().solana_client with async/await function
         let account_data = self
             .helius
             .rpc()
             .solana_client
-            .get_account(&account_pubkey)
-            .unwrap();
+            .get_account(&account_pubkey)?;
 
         let updated_account = Account {
             account_pubkey,
@@ -105,15 +107,18 @@ impl Retrieval {
         let request: ParseTransactionsRequest = ParseTransactionsRequest {
             transactions: vec![tx_signature],
         };
-        let tx_response = &self.helius.parse_transactions(request).await.unwrap()[0];
+        let tx_response = &self.helius.parse_transactions(request).await?[0];
 
         let native_transfers = tx_response
             .native_transfers
             .as_ref()
-            .unwrap()
+            .expect("Native transfers cannot be parsed.")
             .iter()
             .map(|native_transfer| NativeTransfer {
-                amount: native_transfer.amount.as_u64().unwrap(),
+                amount: native_transfer
+                    .amount
+                    .as_u64()
+                    .expect("Amount cannot be parsed."),
                 from_user_account: native_transfer.user_accounts.from_user_account.clone(),
                 to_user_account: native_transfer.user_accounts.to_user_account.clone(),
             })

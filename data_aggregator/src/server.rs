@@ -134,7 +134,9 @@ async fn run_axum_serve(
         .layer(Extension(aggregator));
 
     let address = "127.0.0.1:3000";
-    let listener = tokio::net::TcpListener::bind(address).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(address)
+        .await
+        .expect("Tcp listener failed.");
 
     println!("Starting server at {:?}", address);
 
@@ -143,7 +145,7 @@ async fn run_axum_serve(
             _ = close_rx.await;
         })
         .await
-        .unwrap();
+        .expect("Server start failed.");
 
     Ok(())
 }
