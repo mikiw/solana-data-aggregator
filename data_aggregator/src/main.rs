@@ -6,12 +6,16 @@ mod types;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // TODO: Currently, the pooling strategy is implemented with server_monitor.
+    // Check the possibility of a push aproach and check features of the Solana rpc,
+    // such as listening to the latest processed slot of a validator
     // TODO: Add Persistent Data Storage (optional).
     // TODO: Add more complicated test scenarios in data_aggregator_tests, for example:
     // many transactions in one test, many accounts in one test, tests with fn update_accounts().
     // TODO: Add server integration tests. Probably use the release version and start as the process.
     // TODO: Add load tests with more data.
     // TODO: Check again error handling and propagations with more tests.
+    // TODO: Add separation between the data aggregated by the aggregator and the api consuming the data from the aggregator.
 
     run_server().await?;
 

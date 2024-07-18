@@ -11,8 +11,7 @@ use crate::types::{Account, Database, NativeTransfer, Retrieval, Transaction};
 
 impl Retrieval {
     pub fn new() -> Self {
-        // Since this is a private repo, the api_key can be included here. Once it becomes public,
-        // this api_key needs to be deprecated on the Helius page.
+        // Free Helius API key.
         let helius = match Helius::new("24cf0798-4008-4c81-aa5e-2875323278cd", Cluster::MainnetBeta)
         {
             Ok(helius) => helius,
@@ -155,6 +154,7 @@ impl Retrieval {
     // TODO: Implement update_transactions based on some criteria.
     // This can also be achieved by crawling block by block
     // from a certain block height, similar to normal block indexers.
+    // Multiprocess communication can also be useful here.
     // pub async fn update_transactions(&mut self) -> Result<(), Error> {
     //     Ok(())
     // }
