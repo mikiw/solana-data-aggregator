@@ -1,7 +1,13 @@
+use axum::{
+    body::Body,
+    http::{Response, StatusCode},
+    response::IntoResponse,
+};
 use helius::Helius;
 use serde::Serialize;
 use solana_sdk::pubkey::Pubkey;
 use std::{collections::HashMap, sync::Arc};
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 /// DataAggregator can be shared between threads with read/write lock access
@@ -18,8 +24,8 @@ impl DataAggregator {
     }
 }
 
-// TODO: helius and database can be abstracted in future to handle
-// different types of APIs and databases
+// TODO: Helius and database can be abstracted in future to handle different
+// types of APIs and databases. Generics can be used here.
 pub struct Retrieval {
     pub helius: Helius,
     pub database: Database,
@@ -66,4 +72,31 @@ pub struct NativeTransfer {
     pub amount: u64,
     pub from_user_account: Option<String>,
     pub to_user_account: Option<String>,
+}
+
+// Define a custom error type
+#[derive(Error, Debug)]
+pub enum AppError {
+    #[error("Bad Request: {0}")]
+    BadRequest(String),
+    // This might be used later
+    // #[error("Internal Server Error: {0}")]
+    // InternalServerError(String),
+}
+
+// Implement IntoResponse for your custom error type
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response<Body> {
+        let (status, message) = match self {
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            // AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        };
+
+        let body = format!("{{\"error\": \"{}\"}}", message);
+        Response::builder()
+            .status(status)
+            .header("Content-Type", "application/json")
+            .body(Body::from(body))
+            .unwrap()
+    }
 }

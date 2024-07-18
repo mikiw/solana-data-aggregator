@@ -1,12 +1,15 @@
+use std::str::FromStr;
 use std::time::Duration;
 
 use axum::{extract::Path, routing::get, Extension, Json, Router};
 use futures::future::join_all;
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::Signature;
 use tokio::task::{self};
 use tokio::time::interval;
 use tower_http::timeout::TimeoutLayer;
 
-use crate::types::{Account, DataAggregator, Retrieval, Transaction};
+use crate::types::{Account, AppError, DataAggregator, Retrieval, Transaction};
 
 async fn server_log(aggregator: DataAggregator, interval_in_sec: u64) -> Result<(), anyhow::Error> {
     let mut interval = interval(Duration::from_secs(interval_in_sec));
@@ -47,14 +50,20 @@ async fn server_monitor(
 async fn get_account(
     Extension(aggregator): Extension<DataAggregator>,
     Path(account_id): Path<String>,
-) -> Result<Json<Account>, axum::http::StatusCode> {
+) -> Result<Json<Account>, AppError> {
+    // account_id validation
+    account_id
+        .as_str()
+        .parse::<Pubkey>()
+        .map_err(|_| AppError::BadRequest("Account validation failed.".into()))?;
+
     let account_exists = aggregator
         .retrieval
         .read()
         .await
         .account_exists(account_id.clone())
         .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| AppError::BadRequest("Account exists check failed.".into()))?;
 
     if account_exists {
         // Account is already cached in database.
@@ -66,7 +75,7 @@ async fn get_account(
             .await
             .get_account(account_id)
             .await
-            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(|_| AppError::BadRequest("Account get failed.".into()))?;
 
         Ok(Json(account))
     } else {
@@ -78,7 +87,7 @@ async fn get_account(
             .await
             .fetch_account(account_id)
             .await
-            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(|_| AppError::BadRequest("Account fetch failed.".into()))?;
 
         Ok(Json(account))
     }
@@ -87,14 +96,18 @@ async fn get_account(
 async fn get_transaction(
     Extension(aggregator): Extension<DataAggregator>,
     Path(tx_signature): axum::extract::Path<String>,
-) -> Result<Json<Transaction>, axum::http::StatusCode> {
+) -> Result<Json<Transaction>, AppError> {
+    // tx_signature validation
+    Signature::from_str(&tx_signature)
+        .map_err(|_| AppError::BadRequest("Invalid transaction signature format.".into()))?;
+
     let transaction_exists = aggregator
         .retrieval
         .read()
         .await
         .transaction_exists(tx_signature.clone())
         .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| AppError::BadRequest("Transaction exists check failed.".into()))?;
 
     if transaction_exists {
         // Transaction is already cached in database.
@@ -104,7 +117,7 @@ async fn get_transaction(
             .await
             .get_transaction(tx_signature)
             .await
-            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(|_| AppError::BadRequest("Transaction get failed.".into()))?;
 
         Ok(Json(transaction))
     } else {
@@ -116,7 +129,7 @@ async fn get_transaction(
             .await
             .fetch_transaction(tx_signature)
             .await
-            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(|_| AppError::BadRequest("Transaction fetch failed.".into()))?;
 
         Ok(Json(transactions))
     }
