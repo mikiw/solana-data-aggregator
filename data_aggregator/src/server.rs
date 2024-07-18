@@ -57,40 +57,38 @@ async fn get_account(
         .parse::<Pubkey>()
         .map_err(|_| AppError::BadRequest("Account validation failed.".into()))?;
 
-    let account_exists = aggregator
-        .retrieval
-        .read()
-        .await
-        .account_exists(account_id.clone())
-        .await
-        .map_err(|_| AppError::BadRequest("Account exists check failed.".into()))?;
-
-    if account_exists {
-        // Account is already cached in database.
-        // We assume that data is already updated by pooling task but
-        // an additional query mechanism can be also added here.
-        let account = aggregator
-            .retrieval
-            .read()
-            .await
-            .get_account(account_id)
-            .await
-            .map_err(|_| AppError::BadRequest("Account get failed.".into()))?;
-
-        Ok(Json(account))
-    } else {
-        // The account doesn't exist in the memory database, so we need to
-        // fetch it from the API and store it in the memory database.
-        let account = aggregator
-            .retrieval
-            .write()
-            .await
-            .fetch_account(account_id)
-            .await
-            .map_err(|_| AppError::BadRequest("Account fetch failed.".into()))?;
-
-        Ok(Json(account))
+    {
+        // Check if the account exists in the cache
+        let read_lock = aggregator.retrieval.read().await;
+        match read_lock.account_exists(account_id.clone()).await {
+            Ok(true) => {
+                // If it exists, retrieve it from the cache
+                return read_lock
+                    .get_account(account_id)
+                    .await
+                    .map(Json)
+                    .map_err(|_| {
+                        AppError::InternalServerError("Failed to get account from cache.".into())
+                    });
+            }
+            Ok(false) => {
+                // Proceed to fetch the account from the external source later
+            }
+            Err(_) => {
+                return Err(AppError::InternalServerError(
+                    "Account existence check failed.".into(),
+                ))
+            }
+        }
     }
+
+    // Acquire a write lock to fetch and store the account
+    let mut write_lock = aggregator.retrieval.write().await;
+    write_lock
+        .fetch_account(account_id)
+        .await
+        .map(Json)
+        .map_err(|_| AppError::InternalServerError("Failed to fetch account.".into()))
 }
 
 async fn get_transaction(
@@ -101,38 +99,38 @@ async fn get_transaction(
     Signature::from_str(&tx_signature)
         .map_err(|_| AppError::BadRequest("Invalid transaction signature format.".into()))?;
 
-    let transaction_exists = aggregator
-        .retrieval
-        .read()
-        .await
-        .transaction_exists(tx_signature.clone())
-        .await
-        .map_err(|_| AppError::BadRequest("Transaction exists check failed.".into()))?;
-
-    if transaction_exists {
-        // Transaction is already cached in database.
-        let transaction = aggregator
-            .retrieval
-            .read()
-            .await
-            .get_transaction(tx_signature)
-            .await
-            .map_err(|_| AppError::BadRequest("Transaction get failed.".into()))?;
-
-        Ok(Json(transaction))
-    } else {
-        // The transaction doesn't exist in the memory database, so we need to
-        // fetch it from the API and store it in the memory database.
-        let transactions = aggregator
-            .retrieval
-            .write()
-            .await
-            .fetch_transaction(tx_signature)
-            .await
-            .map_err(|_| AppError::BadRequest("Transaction fetch failed.".into()))?;
-
-        Ok(Json(transactions))
+    {
+        // Check if the transaction exists in the cache
+        let read_lock = aggregator.retrieval.read().await;
+        match read_lock.transaction_exists(tx_signature.clone()).await {
+            Ok(true) => {
+                // If it exists, retrieve it from the cache
+                return read_lock
+                    .get_transaction(tx_signature)
+                    .await
+                    .map(Json)
+                    .map_err(|_| {
+                        AppError::BadRequest("Failed to get transaction from cache.".into())
+                    });
+            }
+            Ok(false) => {
+                // Proceed to fetch the transaction from the external source later
+            }
+            Err(_) => {
+                return Err(AppError::InternalServerError(
+                    "Transaction existence check failed.".into(),
+                ))
+            }
+        }
     }
+
+    // Acquire a write lock to fetch and store the transaction
+    let mut write_lock = aggregator.retrieval.write().await;
+    write_lock
+        .fetch_transaction(tx_signature)
+        .await
+        .map(Json)
+        .map_err(|_| AppError::InternalServerError("Failed to fetch transaction.".into()))
 }
 
 async fn run_axum_serve(

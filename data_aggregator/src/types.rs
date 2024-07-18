@@ -79,9 +79,8 @@ pub struct NativeTransfer {
 pub enum AppError {
     #[error("Bad Request: {0}")]
     BadRequest(String),
-    // This might be used later
-    // #[error("Internal Server Error: {0}")]
-    // InternalServerError(String),
+    #[error("Internal Server Error: {0}")]
+    InternalServerError(String),
 }
 
 // Implement IntoResponse for your custom error type
@@ -89,7 +88,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response<Body> {
         let (status, message) = match self {
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
-            // AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 
         let body = format!("{{\"error\": \"{}\"}}", message);
