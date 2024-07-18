@@ -110,7 +110,7 @@ async fn get_transaction(
                     .await
                     .map(Json)
                     .map_err(|_| {
-                        AppError::BadRequest("Failed to get transaction from cache.".into())
+                        AppError::InternalServerError("Failed to get transaction from cache.".into())
                     });
             }
             Ok(false) => {
