@@ -1,0 +1,37 @@
+name: SBOM and Vulnerability Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sbom_and_scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install Syft
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Install Grype
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Generate SBOM with Syft
+      run: syft . -o cyclonedx-json > sbom.json
+
+    - name: Scan for vulnerabilities with Grype
+      run: grype sbom:sbom.json -o table > grype_report.txt
+
+    - name: Upload SBOM and Vulnerability Report as Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: SBOM-and-Grype-Report
+        path: |
+          sbom.json
+          grype_report.txt
